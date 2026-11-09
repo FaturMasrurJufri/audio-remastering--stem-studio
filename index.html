@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pro Web Audio Remastering & Stem Studio</title>
+  <style>
+    :root {
+      --bg-primary: #090d16;
+      --bg-panel: #131c2e;
+      --bg-card: #1e293b;
+      --bg-control: #334155;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --stem-accent: #a855f7;
+      --success: #22c55e;
+      --warning: #eab308;
+      --danger: #ef4444;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      line-height: 1.5;
+      padding: 20px;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    .studio-container {
+      width: 100%;
+      max-width: 1080px;
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .studio-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .studio-header h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: 0.5px;
+    }
+
+    /* Badge Identitas Developer dengan animasi kelap-kelip */
+    .dev-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background-color: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--accent);
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-main);
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
+    }
+
+    .blink-dot {
+      width: 9px;
+      height: 9px;
+      background-color: var(--success);
+      border-radius: 50%;
+      display: inline-block;
+      animation: pulseBlink 1s infinite ease-in-out;
+    }
+
+    @keyframes pulseBlink {
+      0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+        box-shadow: 0 0 8px var(--success), 0 0 14px var(--success);
+      }
+      50% {
+        opacity: 0.15;
+        transform: scale(0.75);
+        box-shadow: none;
+      }
+    }
+
+    .status-badge {
+      font-size: 0.8rem;
+      padding: 5px 12px;
+      border-radius: 999px;
+      background-color: var(--bg-control);
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .status-badge.ready {
+      background-color: rgba(34, 197, 94, 0.15);
+      color: var(--success);
+      border: 1px solid rgba(34, 197, 94, 0.4);
+    }
+
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 18px;
+      text-align: center;
+      background-color: rgba(9, 13, 22, 0.5);
+      transition: border-color 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .upload-zone:hover {
+      border-color: var(--accent);
+    }
+
+    .upload-zone input[type="file"] {
+      display: none;
+    }
+
+    .btn {
+      padding: 9px 16px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      color: var(--text-main);
+      background-color: var(--bg-control);
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background-color: var(--accent);
+      color: #090d16;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background-color: var(--accent-hover);
+      color: var(--text-main);
+    }
+
+    .btn-success {
+      background-color: var(--success);
+      color: #090d16;
+    }
+
+    .btn-success:hover:not(:disabled) {
+      filter: brightness(1.1);
+    }
+
+    .btn-bypass.active {
+      background-color: var(--danger);
+      color: var(--text-main);
+    }
+
+    .visualizer-box {
+      background-color: #050811;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      height: 130px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .visualizer-box canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .transport-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      background-color: var(--bg-card);
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+
+    .transport-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .time-display {
+      font-family: monospace;
+      font-size: 0.95rem;
+      color: var(--accent);
+      margin-left: 6px;
+    }
+
+    /* Notifikasi Selesai Download */
+    .download-notification {
+      display: none;
+      background-color: rgba(34, 197, 94, 0.12);
+      border: 1px solid var(--success);
+      border-radius: 10px;
+      padding: 14px 18px;
+      color: var(--text-main);
+      font-size: 0.85rem;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .download-notification.show {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .download-info strong {
+      color: var(--success);
+      display: block;
+      font-size: 0.95rem;
+      margin-bottom: 2px;
+    }
+
+    .download-path {
+      font-family: monospace;
+      background-color: rgba(9, 13, 22, 0.7);
+      padding: 3px 8px;
+      border-radius: 4px;
+      color: var(--accent);
+      word-break: break-all;
+    }
+
+    .section-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-left: 3px solid var(--accent);
+      padding-left: 10px;
+    }
+
+    .section-title.stem-title {
+      border-left-color: var(--stem-accent);
+    }
+
+    /* Grid Stem Instrumen */
+    .stems-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+      gap: 12px;
+    }
+
+    .stem-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: border-color 0.2s;
+    }
+
+    .stem-card.solo-active {
+      border-color: var(--warning);
+      box-shadow: 0 0 10px rgba(234, 179, 8, 0.2);
+    }
+
+    .stem-card.mute-active {
+      opacity: 0.55;
+      border-color: var(--danger);
+    }
+
+    .stem-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .stem-name {
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--text-main);
+    }
+
+    .stem-freq {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-family: monospace;
+    }
+
+    .stem-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn-mini {
+      flex: 1;
+      padding: 4px 0;
+      font-size: 0.72rem;
+      font-weight: 700;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background-color: rgba(9, 13, 22, 0.6);
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    .btn-mini.mute-btn.active {
+      background-color: var(--danger);
+      color: #fff;
+      border-color: var(--danger);
+    }
+
+    .btn-mini.solo-btn.active {
+      background-color: var(--warning);
+      color: #090d16;
+      border-color: var(--warning);
+    }
+
+    .preset-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .btn-preset {
+      padding: 6px 12px;
+      font-size: 0.78rem;
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px;
+    }
+
+    .control-card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .control-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+
+    .control-value {
+      color: var(--accent);
+      font-family: monospace;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .stem-card input[type="range"] {
+      accent-color: var(--stem-accent);
+    }
+
+    .control-desc {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <main class="studio-container">
+    <header class="studio-header">
+      <div class="header-left">
+        <h1>DSP Audio Remastering & Stem Studio</h1>
+        <div class="dev-badge" title="Identitas Pengembang">
+          <span class="blink-dot"></span>
+          <span>developer: fatur62</span>
+        </div>
+      </div>
+      <span id="statusBadge" class="status-badge">Menunggu File Audio</span>
+    </header>
+
+    <section class="upload-zone">
+      <label for="audioUpload" class="btn btn-primary">Pilih File Audio (MP3 / WAV / FLAC)</label>
+      <input type="file" id="audioUpload" accept="audio/*" />
+      <p id="fileNameDisplay" style="font-size: 0.82rem; color: var(--text-muted);">Belum ada file yang dipilih.</p>
+    </section>
+
+    <section class="visualizer-box">
+      <canvas id="spectrumCanvas"></canvas>
+    </section>
+
+    <section class="transport-bar">
+      <div class="transport-controls">
+        <button id="playPauseBtn" class="btn btn-primary" disabled>Play</button>
+        <button id="stopBtn" class="btn" disabled>Stop</button>
+        <button id="bypassBtn" class="btn btn-bypass" disabled>Mode: Remastered (Aktif)</button>
+        <span id="timeDisplay" class="time-display">00:00 / 00:00</span>
+      </div>
+      <div>
+        <button id="exportBtn" class="btn btn-success" disabled>Render & Download (WAV)</button>
+      </div>
+    </section>
+
+    <!-- Panel Keterangan Selesai Download & Lokasi Penyimpanan -->
+    <section id="downloadNotif" class="download-notification">
+      <div class="download-info">
+        <strong>✔ Selesai Download Audio Remastered!</strong>
+        <span>Nama File: <code id="savedFileName" class="download-path">-</code></span>
+        <div style="margin-top: 4px;">
+          <span>Lokasi Penyimpanan: <code id="savedFilePath" class="download-path">-</code></span>
+        </div>
+      </div>
+      <button id="closeNotifBtn" class="btn" style="padding: 4px 10px; font-size: 0.75rem;">Tutup</button>
+    </section>
+
+    <!-- Bagian Stem Instrumen & Vokal -->
+    <div class="section-title stem-title">
+      <span>Stem Mixer (Vocal, Bass, Gitar & Alat Musik)</span>
+      <button id="resetStemsBtn" class="btn btn-preset">Reset Stem</button>
+    </div>
+
+    <section id="stemsContainer" class="stems-grid"></section>
+
+    <!-- Bagian Master EQ & Dynamics -->
+    <div class="section-title">
+      <span>Master Remastering Chain</span>
+      <div class="preset-bar">
+        <button class="btn btn-preset" data-preset="modernPop">Modern Clarity</button>
+        <button class="btn btn-preset" data-preset="warmAnalog">Warm Bass</button>
+        <button class="btn btn-preset" data-preset="vocalBoost">Vocal Focus</button>
+        <button class="btn btn-preset" data-preset="flatReset">Reset Master</button>
+      </div>
+    </div>
+
+    <section class="controls-grid">
+      <div class="control-card">
+        <div class="control-header">
+          <label for="subCutSlider">Low Cut (Clean Mud)</label>
+          <span id="subCutVal" class="control-value">35 Hz</span>
+        </div>
+        <input type="range" id="subCutSlider" min="20" max="120" step="1" value="35">
+        <p class="control-desc">Memotong frekuensi gemuruh bawah yang membuat suara mendem.</p>
+      </div>
+
+      <div class="control-card">
+        <div class="control-header">
+          <label for="bassSlider">Sub & Low Boost (75Hz)</label>
+          <span id="bassVal" class="control-value">+2.0 dB</span>
+        </div>
+        <input type="range" id="bassSlider" min="-12" max="12" step="0.5" value="2.0">
+        <p class="control-desc">Menambah fondasi frekuensi bawah secara menyeluruh.</p>
+      </div>
+
+      <div class="control-card">
+        <div class="control-header">
+          <label for="airSlider">High Air / Sparkle (10kHz)</label>
+          <span id="airVal" class="control-value">+3.0 dB</span>
+        </div>
+        <input type="range" id="airSlider" min="-12" max="12" step="0.5" value="3.0">
+        <p class="control-desc">Mengembalikan detail frekuensi tinggi MP3 yang terkompresi.</p>
+      </div>
+
+      <div class="control-card">
+        <div class="control-header">
+          <label for="compSlider">Dynamic Glue (Compressor)</label>
+          <span id="compVal" class="control-value">-18 dB</span>
+        </div>
+        <input type="range" id="compSlider" min="-40" max="0" step="1" value="-18">
+        <p class="control-desc">Meratakan dinamika suara agar lebih padat dan stabil.</p>
+      </div>
+
+      <div class="control-card">
+        <div class="control-header">
+          <label for="gainSlider">Master Loudness (Limiter)</label>
+          <span id="gainVal" class="control-value">+3.0 dB</span>
+        </div>
+        <input type="range" id="gainSlider" min="-6" max="12" step="0.5" value="3.0">
+        <p class="control-desc">Menaikkan volume akhir dengan *brickwall limiter* anti-pecah.</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const CONFIG_JSON = JSON.stringify({
+      presets: {
+        modernPop: { subCut: 35, bass: 2.0, air: 3.0, comp: -18, gain: 3.0 },
+        warmAnalog: { subCut: 30, bass: 4.0, air: 1.0, comp: -20, gain: 2.5 },
+        vocalBoost: { subCut: 55, bass: 0.5, air: 2.5, comp: -16, gain: 2.5 },
+        flatReset: { subCut: 20, bass: 0.0, air: 0.0, comp: 0, gain: 0.0 }
+      },
+      stems: [
+        { id: 'drums', name: 'Drum / Kick', freq: 60, q: 1.1, type: 'peaking', labelFreq: '60 Hz' },
+        { id: 'bass', name: 'Bass', freq: 130, q: 1.0, type: 'peaking', labelFreq: '130 Hz' },
+        { id: 'piano', name: 'Piano / Keys', freq: 450, q: 0.9, type: 'peaking', labelFreq: '450 Hz' },
+        { id: 'guitar', name: 'Gitar (Acoustic/Elec)', freq: 1200, q: 0.9, type: 'peaking', labelFreq: '1.2 kHz' },
+        { id: 'vocal', name: 'Vocal (Lead)', freq: 2800, q: 0.85, type: 'peaking', labelFreq: '2.8 kHz' },
+        { id: 'cymbals', name: 'Cymbal / Strings', freq: 7500, q: 1.0, type: 'peaking', labelFreq: '7.5 kHz' }
+      ]
+    });
+
+    class AudioRemasterStudio {
+      constructor() {
+        this.audioCtx = null;
+        this.audioBuffer = null;
+        this.sourceNode = null;
+        this.analyserNode = null;
+        this.masterNodes = null;
+
+        this.isPlaying = false;
+        this.isBypassed = false;
+        this.startTime = 0;
+        this.pauseOffset = 0;
+        this.animationFrameId = null;
+        this.originalFileName = 'audio';
+
+        const config = this.parseConfigSafely(CONFIG_JSON);
+        this.presets = config.presets;
+        this.stemDefinitions = config.stems;
+        this.stemState = {};
+
+        this.initStemStates();
+        this.initDOM();
+        this.renderStemCards();
+        this.bindEvents();
+      }
+
+      parseConfigSafely(jsonStr) {
+        try {
+          const data = JSON.parse(jsonStr);
+          if (!data || typeof data !== 'object' || !Array.isArray(data.stems)) {
+            throw new Error('Struktur JSON tidak sesuai.');
+          }
+          return data;
+        } catch (err) {
+          console.error('Error parsing JSON config:', err);
+          return { presets: {}, stems: [] };
+        }
+      }
+
+      initStemStates() {
+        this.stemDefinitions.forEach((stem) => {
+          this.stemState[stem.id] = {
+            gain: 0,
+            muted: false,
+            solo: false
+          };
+        });
+      }
+
+      initDOM() {
+        this.el = {
+          upload: document.getElementById('audioUpload'),
+          fileName: document.getElementById('fileNameDisplay'),
+          status: document.getElementById('statusBadge'),
+          playPauseBtn: document.getElementById('playPauseBtn'),
+          stopBtn: document.getElementById('stopBtn'),
+          bypassBtn: document.getElementById('bypassBtn'),
+          exportBtn: document.getElementById('exportBtn'),
+          timeDisplay: document.getElementById('timeDisplay'),
+          canvas: document.getElementById('spectrumCanvas'),
+          stemsContainer: document.getElementById('stemsContainer'),
+          resetStemsBtn: document.getElementById('resetStemsBtn'),
+          downloadNotif: document.getElementById('downloadNotif'),
+          savedFileName: document.getElementById('savedFileName'),
+          savedFilePath: document.getElementById('savedFilePath'),
+          closeNotifBtn: document.getElementById('closeNotifBtn'),
+          sliders: {
+            subCut: document.getElementById('subCutSlider'),
+            bass: document.getElementById('bassSlider'),
+            air: document.getElementById('airSlider'),
+            comp: document.getElementById('compSlider'),
+            gain: document.getElementById('gainSlider')
+          },
+          labels: {
+            subCut: document.getElementById('subCutVal'),
+            bass: document.getElementById('bassVal'),
+            air: document.getElementById('airVal'),
+            comp: document.getElementById('compVal'),
+            gain: document.getElementById('gainVal')
+          },
+          presetBtns: document.querySelectorAll('[data-preset]')
+        };
+      }
+
+      renderStemCards() {
+        this.el.stemsContainer.innerHTML = '';
+        this.stemDefinitions.forEach((stem) => {
+          const card = document.createElement('div');
+          card.className = 'stem-card';
+          card.id = `stem-card-${stem.id}`;
+          card.innerHTML = `
+            <div class="stem-top">
+              <span class="stem-name">${stem.name}</span>
+              <span class="stem-freq">${stem.labelFreq}</span>
+            </div>
+            <div class="control-header">
+              <span style="font-size:0.75rem; color:var(--text-muted);">Gain</span>
+              <span id="stem-val-${stem.id}" class="control-value">0.0 dB</span>
+            </div>
+            <input type="range" id="stem-slider-${stem.id}" min="-18" max="12" step="0.5" value="0">
+            <div class="stem-actions">
+              <button type="button" class="btn-mini mute-btn" id="stem-mute-${stem.id}">MUTE</button>
+              <button type="button" class="btn-mini solo-btn" id="stem-solo-${stem.id}">SOLO</button>
+            </div>
+          `;
+          this.el.stemsContainer.appendChild(card);
+
+          const slider = card.querySelector(`#stem-slider-${stem.id}`);
+          const muteBtn = card.querySelector(`#stem-mute-${stem.id}`);
+          const soloBtn = card.querySelector(`#stem-solo-${stem.id}`);
+
+          slider.addEventListener('input', (e) => {
+            this.stemState[stem.id].gain = parseFloat(e.target.value) || 0;
+            this.updateStemUI();
+            this.applyParametersToGraph();
+          });
+
+          muteBtn.addEventListener('click', () => {
+            this.stemState[stem.id].muted = !this.stemState[stem.id].muted;
+            if (this.stemState[stem.id].muted) {
+              this.stemState[stem.id].solo = false;
+            }
+            this.updateStemUI();
+            this.applyParametersToGraph();
+          });
+
+          soloBtn.addEventListener('click', () => {
+            this.stemState[stem.id].solo = !this.stemState[stem.id].solo;
+            if (this.stemState[stem.id].solo) {
+              this.stemState[stem.id].muted = false;
+            }
+            this.updateStemUI();
+            this.applyParametersToGraph();
+          });
+        });
+      }
+
+      updateStemUI() {
+        this.stemDefinitions.forEach((stem) => {
+          const st = this.stemState[stem.id];
+          const card = document.getElementById(`stem-card-${stem.id}`);
+          const valEl = document.getElementById(`stem-val-${stem.id}`);
+          const sliderEl = document.getElementById(`stem-slider-${stem.id}`);
+          const muteBtn = document.getElementById(`stem-mute-${stem.id}`);
+          const soloBtn = document.getElementById(`stem-solo-${stem.id}`);
+
+          sliderEl.value = st.gain;
+          valEl.textContent = `${st.gain >= 0 ? '+' : ''}${st.gain.toFixed(1)} dB`;
+
+          card.classList.toggle('mute-active', st.muted);
+          card.classList.toggle('solo-active', st.solo);
+          muteBtn.classList.toggle('active', st.muted);
+          soloBtn.classList.toggle('active', st.solo);
+        });
+      }
+
+      bindEvents() {
+        this.el.upload.addEventListener('change', (e) => this.handleFileUpload(e));
+        this.el.playPauseBtn.addEventListener('click', () => this.togglePlayPause());
+        this.el.stopBtn.addEventListener('click', () => this.stopAudio());
+        this.el.bypassBtn.addEventListener('click', () => this.toggleBypass());
+        this.el.exportBtn.addEventListener('click', () => this.exportRemasteredWAV());
+
+        this.el.closeNotifBtn.addEventListener('click', () => {
+          this.el.downloadNotif.classList.remove('show');
+        });
+
+        this.el.resetStemsBtn.addEventListener('click', () => {
+          this.initStemStates();
+          this.updateStemUI();
+          this.applyParametersToGraph();
+        });
+
+        Object.keys(this.el.sliders).forEach((key) => {
+          this.el.sliders[key].addEventListener('input', () => {
+            this.updateMasterUI();
+            this.applyParametersToGraph();
+          });
+        });
+
+        this.el.presetBtns.forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const presetName = btn.getAttribute('data-preset');
+            this.loadPreset(presetName);
+          });
+        });
+      }
+
+      async handleFileUpload(event) {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        this.stopAudio();
+        this.el.downloadNotif.classList.remove('show');
+        this.originalFileName = file.name.replace(/\.[^/.]+$/, '');
+        this.el.fileName.textContent = `Memuat & mendekode: ${file.name}...`;
+        this.el.status.textContent = 'Memproses...';
+        this.el.status.classList.remove('ready');
+
+        try {
+          if (!this.audioCtx) {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            this.audioCtx = new AudioContextClass();
+          }
+
+          const arrayBuffer = await file.arrayBuffer();
+          this.audioBuffer = await this.audioCtx.decodeAudioData(arrayBuffer);
+
+          this.el.fileName.textContent = `${file.name} (${this.audioBuffer.sampleRate} Hz, ${this.audioBuffer.numberOfChannels} Ch)`;
+          this.el.status.textContent = 'Siap Remaster';
+          this.el.status.classList.add('ready');
+
+          this.el.playPauseBtn.disabled = false;
+          this.el.stopBtn.disabled = false;
+          this.el.bypassBtn.disabled = false;
+          this.el.exportBtn.disabled = false;
+          this.updateTimeDisplay(0, this.audioBuffer.duration);
+        } catch (error) {
+          console.error('Gagal mendekode audio:', error);
+          this.el.fileName.textContent = 'Gagal membaca file audio. Pastikan format MP3/WAV valid.';
+          this.el.status.textContent = 'Error';
+        }
+      }
+
+      buildMasteringChain(context) {
+        const highpass = context.createBiquadFilter();
+        highpass.type = 'highpass';
+        highpass.Q.value = 0.707;
+
+        // Buat rangkaian node untuk masing-masing Stem Instrumen
+        const stemNodes = {};
+        let prevNode = highpass;
+
+        this.stemDefinitions.forEach((stem) => {
+          const filter = context.createBiquadFilter();
+          filter.type = stem.type;
+          filter.frequency.value = stem.freq;
+          filter.Q.value = stem.q;
+
+          prevNode.connect(filter);
+          prevNode = filter;
+          stemNodes[stem.id] = filter;
+        });
+
+        const bass = context.createBiquadFilter();
+        bass.type = 'lowshelf';
+        bass.frequency.value = 75;
+
+        const air = context.createBiquadFilter();
+        air.type = 'highshelf';
+        air.frequency.value = 10000;
+
+        const compressor = context.createDynamicsCompressor();
+        compressor.knee.value = 12;
+        compressor.ratio.value = 3.5;
+        compressor.attack.value = 0.005;
+        compressor.release.value = 0.15;
+
+        const makeupGain = context.createGain();
+
+        const limiter = context.createDynamicsCompressor();
+        limiter.threshold.value = -0.6;
+        limiter.knee.value = 0.0;
+        limiter.ratio.value = 20.0;
+        limiter.attack.value = 0.001;
+        limiter.release.value = 0.05;
+
+        prevNode.connect(bass);
+        bass.connect(air);
+        air.connect(compressor);
+        compressor.connect(makeupGain);
+        makeupGain.connect(limiter);
+
+        return { highpass, stemNodes, bass, air, compressor, makeupGain, limiter };
+      }
+
+      getMasterParams() {
+        return {
+          subCut: parseFloat(this.el.sliders.subCut.value) || 20,
+          bass: parseFloat(this.el.sliders.bass.value) || 0,
+          air: parseFloat(this.el.sliders.air.value) || 0,
+          comp: parseFloat(this.el.sliders.comp.value) || 0,
+          gain: parseFloat(this.el.sliders.gain.value) || 0
+        };
+      }
+
+      applyParametersToNodes(chain, masterParams, isBypassed, currentTime = 0) {
+        if (!chain || !chain.highpass) return;
+
+        if (isBypassed) {
+          chain.highpass.frequency.setValueAtTime(10, currentTime);
+          Object.values(chain.stemNodes).forEach((node) => {
+            node.gain.setValueAtTime(0, currentTime);
+          });
+          chain.bass.gain.setValueAtTime(0, currentTime);
+          chain.air.gain.setValueAtTime(0, currentTime);
+          chain.compressor.threshold.setValueAtTime(0, currentTime);
+          chain.makeupGain.gain.setValueAtTime(1, currentTime);
+          return;
+        }
+
+        chain.highpass.frequency.setValueAtTime(masterParams.subCut, currentTime);
+
+        const anySoloActive = Object.values(this.stemState).some((s) => s.solo);
+
+        this.stemDefinitions.forEach((stem) => {
+          const st = this.stemState[stem.id];
+          const node = chain.stemNodes[stem.id];
+          if (!node) return;
+
+          let effectiveGain = st.gain;
+          if (st.muted) {
+            effectiveGain = -24;
+          } else if (anySoloActive) {
+            effectiveGain = st.solo ? Math.max(st.gain, 4.5) : -20;
+          }
+          node.gain.setValueAtTime(effectiveGain, currentTime);
+        });
+
+        chain.bass.gain.setValueAtTime(masterParams.bass, currentTime);
+        chain.air.gain.setValueAtTime(masterParams.air, currentTime);
+        chain.compressor.threshold.setValueAtTime(masterParams.comp, currentTime);
+
+        const linearGain = Math.pow(10, masterParams.gain / 20);
+        chain.makeupGain.gain.setValueAtTime(linearGain, currentTime);
+      }
+
+      applyParametersToGraph() {
+        if (!this.audioCtx || !this.masterNodes) return;
+        const params = this.getMasterParams();
+        this.applyParametersToNodes(this.masterNodes, params, this.isBypassed, this.audioCtx.currentTime);
+      }
+
+      updateMasterUI() {
+        const p = this.getMasterParams();
+        this.el.labels.subCut.textContent = `${p.subCut} Hz`;
+        this.el.labels.bass.textContent = `${p.bass >= 0 ? '+' : ''}${p.bass.toFixed(1)} dB`;
+        this.el.labels.air.textContent = `${p.air >= 0 ? '+' : ''}${p.air.toFixed(1)} dB`;
+        this.el.labels.comp.textContent = `${p.comp} dB`;
+        this.el.labels.gain.textContent = `${p.gain >= 0 ? '+' : ''}${p.gain.toFixed(1)} dB`;
+      }
+
+      loadPreset(presetKey) {
+        const preset = this.presets?.[presetKey];
+        if (!preset) return;
+
+        this.el.sliders.subCut.value = preset.subCut;
+        this.el.sliders.bass.value = preset.bass;
+        this.el.sliders.air.value = preset.air;
+        this.el.sliders.comp.value = preset.comp;
+        this.el.sliders.gain.value = preset.gain;
+
+        this.updateMasterUI();
+        this.applyParametersToGraph();
+      }
+
+      togglePlayPause() {
+        if (!this.audioBuffer) return;
+        if (this.isPlaying) {
+          this.pauseAudio();
+        } else {
+          this.playAudio();
+        }
+      }
+
+      async playAudio() {
+        if (this.audioCtx.state === 'suspended') {
+          await this.audioCtx.resume();
+        }
+
+        this.sourceNode = this.audioCtx.createBufferSource();
+        this.sourceNode.buffer = this.audioBuffer;
+
+        this.masterNodes = this.buildMasteringChain(this.audioCtx);
+        this.analyserNode = this.audioCtx.createAnalyser();
+        this.analyserNode.fftSize = 512;
+        this.analyserNode.smoothingTimeConstant = 0.8;
+
+        this.applyParametersToGraph();
+
+        this.sourceNode.connect(this.masterNodes.highpass);
+        this.masterNodes.limiter.connect(this.analyserNode);
+        this.analyserNode.connect(this.audioCtx.destination);
+
+        this.sourceNode.onended = () => {
+          if (this.isPlaying) {
+            this.stopAudio();
+          }
+        };
+
+        this.startTime = this.audioCtx.currentTime - this.pauseOffset;
+        this.sourceNode.start(0, this.pauseOffset);
+        this.isPlaying = true;
+        this.el.playPauseBtn.textContent = 'Pause';
+        this.startVisualizerLoop();
+      }
+
+      pauseAudio() {
+        if (!this.isPlaying || !this.sourceNode) return;
+        this.isPlaying = false;
+        this.pauseOffset = this.audioCtx.currentTime - this.startTime;
+        this.sourceNode.stop();
+        this.sourceNode.disconnect();
+        this.el.playPauseBtn.textContent = 'Play';
+        cancelAnimationFrame(this.animationFrameId);
+      }
+
+      stopAudio() {
+        if (this.sourceNode) {
+          this.isPlaying = false;
+          try {
+            this.sourceNode.stop();
+            this.sourceNode.disconnect();
+          } catch (e) {
+            // Node sudah berhenti
+          }
+        }
+        this.pauseOffset = 0;
+        this.el.playPauseBtn.textContent = 'Play';
+        cancelAnimationFrame(this.animationFrameId);
+        if (this.audioBuffer) {
+          this.updateTimeDisplay(0, this.audioBuffer.duration);
+        }
+      }
+
+      toggleBypass() {
+        this.isBypassed = !this.isBypassed;
+        if (this.isBypassed) {
+          this.el.bypassBtn.textContent = 'Mode: Bypass (Suara Asli)';
+          this.el.bypassBtn.classList.add('active');
+        } else {
+          this.el.bypassBtn.textContent = 'Mode: Remastered (Aktif)';
+          this.el.bypassBtn.classList.remove('active');
+        }
+        this.applyParametersToGraph();
+      }
+
+      startVisualizerLoop() {
+        const canvas = this.el.canvas;
+        const ctx = canvas.getContext('2d');
+        const bufferLength = this.analyserNode.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+
+        const renderFrame = () => {
+          if (!this.isPlaying) return;
+
+          const elapsed = this.audioCtx.currentTime - this.startTime;
+          if (elapsed <= this.audioBuffer.duration) {
+            this.updateTimeDisplay(elapsed, this.audioBuffer.duration);
+          }
+
+          canvas.width = canvas.clientWidth;
+          canvas.height = canvas.clientHeight;
+          this.analyserNode.getByteFrequencyData(dataArray);
+
+          ctx.fillStyle = '#050811';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          const barWidth = (canvas.width / bufferLength) * 2.2;
+          let x = 0;
+
+          for (let i = 0; i < bufferLength; i++) {
+            const barHeight = (dataArray[i] / 255) * canvas.height;
+            ctx.fillStyle = this.isBypassed ? '#64748b' : '#38bdf8';
+            ctx.fillRect(x, canvas.height - barHeight, barWidth - 1, barHeight);
+            x += barWidth;
+          }
+
+          this.animationFrameId = requestAnimationFrame(renderFrame);
+        };
+
+        renderFrame();
+      }
+
+      updateTimeDisplay(current, total) {
+        const format = (sec) => {
+          const m = Math.floor(sec / 60).toString().padStart(2, '0');
+          const s = Math.floor(sec % 60).toString().padStart(2, '0');
+          return `${m}:${s}`;
+        };
+        this.el.timeDisplay.textContent = `${format(current)} / ${format(total)}`;
+      }
+
+      async exportRemasteredWAV() {
+        if (!this.audioBuffer) return;
+
+        this.el.exportBtn.disabled = true;
+        this.el.exportBtn.textContent = 'Merender Audio...';
+        this.el.downloadNotif.classList.remove('show');
+
+        const defaultOutputName = `${this.originalFileName}_Remastered_fatur62.wav`;
+
+        try {
+          const offlineCtx = new OfflineAudioContext(
+            this.audioBuffer.numberOfChannels,
+            this.audioBuffer.length,
+            this.audioBuffer.sampleRate
+          );
+
+          const offlineSource = offlineCtx.createBufferSource();
+          offlineSource.buffer = this.audioBuffer;
+
+          const offlineChain = this.buildMasteringChain(offlineCtx);
+          const params = this.getMasterParams();
+          this.applyParametersToNodes(offlineChain, params, false, 0);
+
+          offlineSource.connect(offlineChain.highpass);
+          offlineChain.limiter.connect(offlineCtx.destination);
+          offlineSource.start(0);
+
+          const renderedBuffer = await offlineCtx.startRendering();
+          const wavBlob = this.encodeAudioBufferToWav(renderedBuffer);
+
+          let finalFileName = defaultOutputName;
+          let finalLocationDesc = 'Folder "Downloads" (Unduhan Default Browser)';
+
+          // Gunakan File System Access API jika didukung agar pengguna bisa memilih folder secara langsung
+          if ('showSaveFilePicker' in window) {
+            try {
+              const fileHandle = await window.showSaveFilePicker({
+                suggestedName: defaultOutputName,
+                types: [{
+                  description: 'WAV Audio File',
+                  accept: { 'audio/wav': ['.wav'] }
+                }]
+              });
+              const writable = await fileHandle.createWritable();
+              await writable.write(wavBlob);
+              await writable.close();
+
+              finalFileName = fileHandle.name;
+              finalLocationDesc = `Folder Pilihan Anda -> ${fileHandle.name}`;
+            } catch (pickerErr) {
+              if (pickerErr.name === 'AbortError') {
+                return; // Pengguna membatalkan dialog simpan
+              }
+              this.triggerFallbackDownload(wavBlob, defaultOutputName);
+            }
+          } else {
+            this.triggerFallbackDownload(wavBlob, defaultOutputName);
+          }
+
+          this.showDownloadSuccess(finalFileName, finalLocationDesc);
+        } catch (error) {
+          console.error('Gagal melakukan rendering offline:', error);
+        } finally {
+          this.el.exportBtn.disabled = false;
+          this.el.exportBtn.textContent = 'Render & Download (WAV)';
+        }
+      }
+
+      triggerFallbackDownload(blob, filename) {
+        const downloadUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = downloadUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(downloadUrl);
+        a.remove();
+      }
+
+      showDownloadSuccess(fileName, locationInfo) {
+        this.el.savedFileName.textContent = fileName;
+        this.el.savedFilePath.textContent = locationInfo;
+        this.el.downloadNotif.classList.add('show');
+      }
+
+      encodeAudioBufferToWav(buffer) {
+        const numOfChan = buffer.numberOfChannels;
+        const length = buffer.length * numOfChan * 2 + 44;
+        const outBuffer = new ArrayBuffer(length);
+        const view = new DataView(outBuffer);
+        const channels = [];
+        let sample = 0;
+        let offset = 0;
+        let pos = 0;
+
+        const setUint16 = (data) => {
+          view.setUint16(pos, data, true);
+          pos += 2;
+        };
+        const setUint32 = (data) => {
+          view.setUint32(pos, data, true);
+          pos += 4;
+        };
+
+        setUint32(0x46464952); // "RIFF"
+        setUint32(length - 8);
+        setUint32(0x45564157); // "WAVE"
+        setUint32(0x20746d66); // "fmt "
+        setUint32(16);
+        setUint16(1); // PCM
+        setUint16(numOfChan);
+        setUint32(buffer.sampleRate);
+        setUint32(buffer.sampleRate * 2 * numOfChan);
+        setUint16(numOfChan * 2);
+        setUint16(16);
+        setUint32(0x61746164); // "data"
+        setUint32(length - pos - 4);
+
+        for (let i = 0; i < numOfChan; i++) {
+          channels.push(buffer.getChannelData(i));
+        }
+
+        while (pos < length) {
+          for (let i = 0; i < numOfChan; i++) {
+            sample = Math.max(-1, Math.min(1, channels[i][offset]));
+            sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+            view.setInt16(pos, sample, true);
+            pos += 2;
+          }
+          offset++;
+        }
+
+        return new Blob([outBuffer], { type: 'audio/wav' });
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      new AudioRemasterStudio();
+    });
+  </script>
+</body>
+</html>
