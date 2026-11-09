@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pro Web Audio Remastering & Stem Studio</title>
+  <!-- Library LameJS untuk Encoding MP3 langsung di Browser -->
+  <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
   <style>
     :root {
       --bg-primary: #090d16;
@@ -228,6 +230,31 @@
       flex-wrap: wrap;
     }
 
+    .export-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .format-select {
+      padding: 9px 12px;
+      border-radius: 6px;
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      border: 1px solid var(--accent);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .format-select:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      border-color: var(--border);
+    }
+
     .time-display {
       font-family: monospace;
       font-size: 0.95rem;
@@ -263,7 +290,7 @@
       color: var(--success);
       display: block;
       font-size: 0.95rem;
-      margin-bottom: 2px;
+      margin-bottom: 4px;
     }
 
     .download-path {
@@ -284,6 +311,8 @@
       justify-content: space-between;
       border-left: 3px solid var(--accent);
       padding-left: 10px;
+      flex-wrap: wrap;
+      gap: 8px;
     }
 
     .section-title.stem-title {
@@ -436,7 +465,7 @@
     </header>
 
     <section class="upload-zone">
-      <label for="audioUpload" class="btn btn-primary">Pilih File Audio (MP3 / WAV / FLAC)</label>
+      <label for="audioUpload" class="btn btn-primary">Pilih File Audio (MP3 / WAV / FLAC / OGG)</label>
       <input type="file" id="audioUpload" accept="audio/*" />
       <p id="fileNameDisplay" style="font-size: 0.82rem; color: var(--text-muted);">Belum ada file yang dipilih.</p>
     </section>
@@ -452,8 +481,17 @@
         <button id="bypassBtn" class="btn btn-bypass" disabled>Mode: Remastered (Aktif)</button>
         <span id="timeDisplay" class="time-display">00:00 / 00:00</span>
       </div>
-      <div>
-        <button id="exportBtn" class="btn btn-success" disabled>Render & Download (WAV)</button>
+
+      <!-- Pilihan Format Download (MP3, WAV, AIFF) -->
+      <div class="export-controls">
+        <select id="formatSelect" class="format-select" disabled title="Pilih Format Output Audio">
+          <option value="mp3_320">MP3 (320 kbps - Kualitas Tinggi)</option>
+          <option value="mp3_192">MP3 (192 kbps - Ukuran Ringan)</option>
+          <option value="wav_16">WAV (16-Bit PCM - Standar CD)</option>
+          <option value="wav_24">WAV (24-Bit Studio - Hi-Res)</option>
+          <option value="aiff_16">AIFF (16-Bit Apple Lossless PCM)</option>
+        </select>
+        <button id="exportBtn" class="btn btn-success" disabled>Render & Download</button>
       </div>
     </section>
 
@@ -461,8 +499,11 @@
     <section id="downloadNotif" class="download-notification">
       <div class="download-info">
         <strong>✔ Selesai Download Audio Remastered!</strong>
-        <span>Nama File: <code id="savedFileName" class="download-path">-</code></span>
-        <div style="margin-top: 4px;">
+        <div>
+          <span>Format: <code id="savedFormatLabel" class="download-path">-</code></span>
+          <span style="margin-left: 8px;">Nama File: <code id="savedFileName" class="download-path">-</code></span>
+        </div>
+        <div style="margin-top: 6px;">
           <span>Lokasi Penyimpanan: <code id="savedFilePath" class="download-path">-</code></span>
         </div>
       </div>
@@ -551,7 +592,14 @@
         { id: 'guitar', name: 'Gitar (Acoustic/Elec)', freq: 1200, q: 0.9, type: 'peaking', labelFreq: '1.2 kHz' },
         { id: 'vocal', name: 'Vocal (Lead)', freq: 2800, q: 0.85, type: 'peaking', labelFreq: '2.8 kHz' },
         { id: 'cymbals', name: 'Cymbal / Strings', freq: 7500, q: 1.0, type: 'peaking', labelFreq: '7.5 kHz' }
-      ]
+      ],
+      exportFormats: {
+        mp3_320: { ext: '.mp3', mime: 'audio/mpeg', label: 'MP3 320 kbps', bitrate: 320 },
+        mp3_192: { ext: '.mp3', mime: 'audio/mpeg', label: 'MP3 192 kbps', bitrate: 192 },
+        wav_16: { ext: '.wav', mime: 'audio/wav', label: 'WAV 16-Bit PCM', bitDepth: 16 },
+        wav_24: { ext: '.wav', mime: 'audio/wav', label: 'WAV 24-Bit Studio PCM', bitDepth: 24 },
+        aiff_16: { ext: '.aiff', mime: 'audio/aiff', label: 'AIFF 16-Bit Apple Audio', bitDepth: 16 }
+      }
     });
 
     class AudioRemasterStudio {
@@ -572,6 +620,7 @@
         const config = this.parseConfigSafely(CONFIG_JSON);
         this.presets = config.presets;
         this.stemDefinitions = config.stems;
+        this.exportFormats = config.exportFormats;
         this.stemState = {};
 
         this.initStemStates();
@@ -584,12 +633,12 @@
         try {
           const data = JSON.parse(jsonStr);
           if (!data || typeof data !== 'object' || !Array.isArray(data.stems)) {
-            throw new Error('Struktur JSON tidak sesuai.');
+            throw new Error('Struktur JSON konfigurasi tidak valid.');
           }
           return data;
         } catch (err) {
           console.error('Error parsing JSON config:', err);
-          return { presets: {}, stems: [] };
+          return { presets: {}, stems: [], exportFormats: {} };
         }
       }
 
@@ -611,12 +660,14 @@
           playPauseBtn: document.getElementById('playPauseBtn'),
           stopBtn: document.getElementById('stopBtn'),
           bypassBtn: document.getElementById('bypassBtn'),
+          formatSelect: document.getElementById('formatSelect'),
           exportBtn: document.getElementById('exportBtn'),
           timeDisplay: document.getElementById('timeDisplay'),
           canvas: document.getElementById('spectrumCanvas'),
           stemsContainer: document.getElementById('stemsContainer'),
           resetStemsBtn: document.getElementById('resetStemsBtn'),
           downloadNotif: document.getElementById('downloadNotif'),
+          savedFormatLabel: document.getElementById('savedFormatLabel'),
           savedFileName: document.getElementById('savedFileName'),
           savedFilePath: document.getElementById('savedFilePath'),
           closeNotifBtn: document.getElementById('closeNotifBtn'),
@@ -715,7 +766,7 @@
         this.el.playPauseBtn.addEventListener('click', () => this.togglePlayPause());
         this.el.stopBtn.addEventListener('click', () => this.stopAudio());
         this.el.bypassBtn.addEventListener('click', () => this.toggleBypass());
-        this.el.exportBtn.addEventListener('click', () => this.exportRemasteredWAV());
+        this.el.exportBtn.addEventListener('click', () => this.exportRemasteredAudio());
 
         this.el.closeNotifBtn.addEventListener('click', () => {
           this.el.downloadNotif.classList.remove('show');
@@ -769,6 +820,7 @@
           this.el.playPauseBtn.disabled = false;
           this.el.stopBtn.disabled = false;
           this.el.bypassBtn.disabled = false;
+          this.el.formatSelect.disabled = false;
           this.el.exportBtn.disabled = false;
           this.updateTimeDisplay(0, this.audioBuffer.duration);
         } catch (error) {
@@ -783,7 +835,6 @@
         highpass.type = 'highpass';
         highpass.Q.value = 0.707;
 
-        // Buat rangkaian node untuk masing-masing Stem Instrumen
         const stemNodes = {};
         let prevNode = highpass;
 
@@ -1037,14 +1088,21 @@
         this.el.timeDisplay.textContent = `${format(current)} / ${format(total)}`;
       }
 
-      async exportRemasteredWAV() {
+      async exportRemasteredAudio() {
         if (!this.audioBuffer) return;
 
+        const formatKey = this.el.formatSelect.value;
+        const formatConfig = this.exportFormats[formatKey] || this.exportFormats.wav_16;
+
         this.el.exportBtn.disabled = true;
-        this.el.exportBtn.textContent = 'Merender Audio...';
+        this.el.formatSelect.disabled = true;
+        this.el.exportBtn.textContent = `Merender ${formatConfig.label}...`;
         this.el.downloadNotif.classList.remove('show');
 
-        const defaultOutputName = `${this.originalFileName}_Remastered_fatur62.wav`;
+        // Beri jeda mikro agar UI tombol sempat memperbarui teks sebelum proses CPU encoding berjalan
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        const defaultOutputName = `${this.originalFileName}_Remastered_fatur62${formatConfig.ext}`;
 
         try {
           const offlineCtx = new OfflineAudioContext(
@@ -1065,43 +1123,57 @@
           offlineSource.start(0);
 
           const renderedBuffer = await offlineCtx.startRendering();
-          const wavBlob = this.encodeAudioBufferToWav(renderedBuffer);
+          let outputBlob = null;
+
+          if (formatKey.startsWith('mp3_')) {
+            outputBlob = this.encodeAudioBufferToMp3(renderedBuffer, formatConfig.bitrate);
+          } else if (formatKey === 'wav_24') {
+            outputBlob = this.encodeAudioBufferToWav24(renderedBuffer);
+          } else if (formatKey === 'aiff_16') {
+            outputBlob = this.encodeAudioBufferToAiff(renderedBuffer);
+          } else {
+            outputBlob = this.encodeAudioBufferToWav16(renderedBuffer);
+          }
 
           let finalFileName = defaultOutputName;
           let finalLocationDesc = 'Folder "Downloads" (Unduhan Default Browser)';
 
-          // Gunakan File System Access API jika didukung agar pengguna bisa memilih folder secara langsung
           if ('showSaveFilePicker' in window) {
             try {
+              const acceptObj = {};
+              acceptObj[formatConfig.mime] = [formatConfig.ext];
+
               const fileHandle = await window.showSaveFilePicker({
                 suggestedName: defaultOutputName,
                 types: [{
-                  description: 'WAV Audio File',
-                  accept: { 'audio/wav': ['.wav'] }
+                  description: formatConfig.label,
+                  accept: acceptObj
                 }]
               });
               const writable = await fileHandle.createWritable();
-              await writable.write(wavBlob);
+              await writable.write(outputBlob);
               await writable.close();
 
               finalFileName = fileHandle.name;
               finalLocationDesc = `Folder Pilihan Anda -> ${fileHandle.name}`;
             } catch (pickerErr) {
               if (pickerErr.name === 'AbortError') {
-                return; // Pengguna membatalkan dialog simpan
+                return;
               }
-              this.triggerFallbackDownload(wavBlob, defaultOutputName);
+              this.triggerFallbackDownload(outputBlob, defaultOutputName);
             }
           } else {
-            this.triggerFallbackDownload(wavBlob, defaultOutputName);
+            this.triggerFallbackDownload(outputBlob, defaultOutputName);
           }
 
-          this.showDownloadSuccess(finalFileName, finalLocationDesc);
+          this.showDownloadSuccess(formatConfig.label, finalFileName, finalLocationDesc);
         } catch (error) {
-          console.error('Gagal melakukan rendering offline:', error);
+          console.error('Gagal melakukan rendering/encoding audio:', error);
+          alert(`Terjadi kesalahan saat mengekspor format ${formatConfig.label}: ${error.message}`);
         } finally {
           this.el.exportBtn.disabled = false;
-          this.el.exportBtn.textContent = 'Render & Download (WAV)';
+          this.el.formatSelect.disabled = false;
+          this.el.exportBtn.textContent = 'Render & Download';
         }
       }
 
@@ -1117,13 +1189,61 @@
         a.remove();
       }
 
-      showDownloadSuccess(fileName, locationInfo) {
+      showDownloadSuccess(formatLabel, fileName, locationInfo) {
+        this.el.savedFormatLabel.textContent = formatLabel;
         this.el.savedFileName.textContent = fileName;
         this.el.savedFilePath.textContent = locationInfo;
         this.el.downloadNotif.classList.add('show');
       }
 
-      encodeAudioBufferToWav(buffer) {
+      floatTo16BitPCM(inputFloat32) {
+        const outputInt16 = new Int16Array(inputFloat32.length);
+        for (let i = 0; i < inputFloat32.length; i++) {
+          const s = Math.max(-1, Math.min(1, inputFloat32[i]));
+          outputInt16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+        return outputInt16;
+      }
+
+      // Encoder MP3 menggunakan LameJS
+      encodeAudioBufferToMp3(buffer, kbps = 320) {
+        if (typeof lamejs === 'undefined') {
+          throw new Error('Library LameJS belum termuat. Periksa koneksi internet Anda atau pilih format WAV/AIFF.');
+        }
+
+        const channels = Math.min(2, buffer.numberOfChannels);
+        const sampleRate = buffer.sampleRate;
+        const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, kbps);
+        const mp3Data = [];
+
+        const leftPCM = this.floatTo16BitPCM(buffer.getChannelData(0));
+        const rightPCM = channels > 1 ? this.floatTo16BitPCM(buffer.getChannelData(1)) : undefined;
+
+        const sampleBlockSize = 1152;
+        for (let i = 0; i < leftPCM.length; i += sampleBlockSize) {
+          const leftChunk = leftPCM.subarray(i, i + sampleBlockSize);
+          let mp3buf;
+          if (channels === 2 && rightPCM) {
+            const rightChunk = rightPCM.subarray(i, i + sampleBlockSize);
+            mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+          } else {
+            mp3buf = mp3encoder.encodeBuffer(leftChunk);
+          }
+          if (mp3buf.length > 0) {
+            mp3Data.push(mp3buf);
+          }
+        }
+
+        const mp3End = mp3encoder.flush();
+        if (mp3End.length > 0) {
+          mp3Data.push(mp3End);
+        }
+
+        return new Blob(mp3Data, { type: 'audio/mpeg' });
+      }
+
+      // Encoder WAV 16-Bit Standar
+      encodeAudioBufferToWav16(buffer) {
         const numOfChan = buffer.numberOfChannels;
         const length = buffer.length * numOfChan * 2 + 44;
         const outBuffer = new ArrayBuffer(length);
@@ -1147,7 +1267,7 @@
         setUint32(0x45564157); // "WAVE"
         setUint32(0x20746d66); // "fmt "
         setUint32(16);
-        setUint16(1); // PCM
+        setUint16(1);
         setUint16(numOfChan);
         setUint32(buffer.sampleRate);
         setUint32(buffer.sampleRate * 2 * numOfChan);
@@ -1171,6 +1291,129 @@
         }
 
         return new Blob([outBuffer], { type: 'audio/wav' });
+      }
+
+      // Encoder WAV 24-Bit Studio Hi-Res
+      encodeAudioBufferToWav24(buffer) {
+        const numOfChan = buffer.numberOfChannels;
+        const bytesPerSample = 3;
+        const dataLength = buffer.length * numOfChan * bytesPerSample;
+        const totalLength = 44 + dataLength;
+        const outBuffer = new ArrayBuffer(totalLength);
+        const view = new DataView(outBuffer);
+        const channels = [];
+        let pos = 0;
+
+        const setUint16 = (data) => {
+          view.setUint16(pos, data, true);
+          pos += 2;
+        };
+        const setUint32 = (data) => {
+          view.setUint32(pos, data, true);
+          pos += 4;
+        };
+
+        setUint32(0x46464952); // "RIFF"
+        setUint32(totalLength - 8);
+        setUint32(0x45564157); // "WAVE"
+        setUint32(0x20746d66); // "fmt "
+        setUint32(16);
+        setUint16(1);
+        setUint16(numOfChan);
+        setUint32(buffer.sampleRate);
+        setUint32(buffer.sampleRate * bytesPerSample * numOfChan);
+        setUint16(numOfChan * bytesPerSample);
+        setUint16(24);
+        setUint32(0x61746164); // "data"
+        setUint32(dataLength);
+
+        for (let i = 0; i < numOfChan; i++) {
+          channels.push(buffer.getChannelData(i));
+        }
+
+        for (let offset = 0; offset < buffer.length; offset++) {
+          for (let i = 0; i < numOfChan; i++) {
+            const s = Math.max(-1, Math.min(1, channels[i][offset]));
+            const val = s < 0 ? Math.floor(s * 8388608) : Math.floor(s * 8388607);
+            view.setUint8(pos, val & 0xff);
+            view.setUint8(pos + 1, (val >> 8) & 0xff);
+            view.setUint8(pos + 2, (val >> 16) & 0xff);
+            pos += 3;
+          }
+        }
+
+        return new Blob([outBuffer], { type: 'audio/wav' });
+      }
+
+      // Encoder AIFF 16-Bit (Big-Endian Apple Lossless PCM)
+      encodeAudioBufferToAiff(buffer) {
+        const numOfChan = buffer.numberOfChannels;
+        const numFrames = buffer.length;
+        const bytesPerSample = 2;
+        const soundDataSize = numFrames * numOfChan * bytesPerSample;
+        const totalSize = 54 + soundDataSize;
+        const outBuffer = new ArrayBuffer(totalSize);
+        const view = new DataView(outBuffer);
+        let pos = 0;
+
+        const writeAscii = (str) => {
+          for (let i = 0; i < str.length; i++) {
+            view.setUint8(pos++, str.charCodeAt(i));
+          }
+        };
+
+        writeAscii('FORM');
+        view.setUint32(pos, totalSize - 8, false);
+        pos += 4;
+        writeAscii('AIFF');
+
+        // COMM Chunk
+        writeAscii('COMM');
+        view.setUint32(pos, 18, false);
+        pos += 4;
+        view.setUint16(pos, numOfChan, false);
+        pos += 2;
+        view.setUint32(pos, numFrames, false);
+        pos += 4;
+        view.setUint16(pos, 16, false);
+        pos += 2;
+
+        // Konversi Sample Rate ke 80-bit IEEE 754 Extended Float
+        const sr = buffer.sampleRate;
+        let exp = Math.floor(Math.log2(sr));
+        const frac = sr / Math.pow(2, exp);
+        const mantissa = Math.round(frac * 0x80000000);
+        view.setUint16(pos, exp + 16383, false);
+        pos += 2;
+        view.setUint32(pos, mantissa, false);
+        pos += 4;
+        view.setUint32(pos, 0, false);
+        pos += 4;
+
+        // SSND Chunk
+        writeAscii('SSND');
+        view.setUint32(pos, soundDataSize + 8, false);
+        pos += 4;
+        view.setUint32(pos, 0, false);
+        pos += 4;
+        view.setUint32(pos, 0, false);
+        pos += 4;
+
+        const channels = [];
+        for (let i = 0; i < numOfChan; i++) {
+          channels.push(buffer.getChannelData(i));
+        }
+
+        for (let offset = 0; offset < numFrames; offset++) {
+          for (let i = 0; i < numOfChan; i++) {
+            const s = Math.max(-1, Math.min(1, channels[i][offset]));
+            const sample = s < 0 ? s * 32768 : s * 32767;
+            view.setInt16(pos, sample, false);
+            pos += 2;
+          }
+        }
+
+        return new Blob([outBuffer], { type: 'audio/aiff' });
       }
     }
 
